@@ -1,3 +1,0 @@
-/*
-  Content-Security-Policy: frame-src https://sslecal2.investing.com https://www.investing.com 'self'
-  X-Frame-Options: SAMEORIGIN
