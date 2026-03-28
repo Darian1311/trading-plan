@@ -1,0 +1,1665 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMC Liquidity Flow</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d0f0e;--bg2:#131614;--bg3:#1a1d1b;--border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);--text:#e8ebe8;--text2:#8a9089;--text3:#5a615a;--green:#4ade80;--green-bg:rgba(74,222,128,0.08);--green-border:rgba(74,222,128,0.2);--red:#f87171;--red-bg:rgba(248,113,113,0.08);--red-border:rgba(248,113,113,0.2);--amber:#fbbf24;--amber-bg:rgba(251,191,36,0.08);--amber-border:rgba(251,191,36,0.2);--blue:#60a5fa;--blue-bg:rgba(96,165,250,0.08);--blue-border:rgba(96,165,250,0.2);--purple:#a78bfa;--purple-bg:rgba(167,139,250,0.08);--purple-border:rgba(167,139,250,0.2);--accent:#4ade80;--radius:10px;--radius-sm:6px;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;font-size:15px;line-height:1.6;min-height:100vh;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(74,222,128,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(74,222,128,0.025) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+/* WELCOME SCREEN */
+#welcome-screen{position:fixed;inset:0;background:var(--bg);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;}
+#welcome-screen.fade-out{animation:welcomeFadeOut 0.6s ease forwards;}
+@keyframes welcomeFadeOut{0%{opacity:1;transform:scale(1);}100%{opacity:0;transform:scale(1.03);}}
+.wlc-tag{font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);letter-spacing:0.16em;text-transform:uppercase;opacity:0;animation:wlcFadeUp 0.5s ease 0.3s forwards;}
+.wlc-greeting{font-family:'Syne',sans-serif;font-size:18px;font-weight:400;color:var(--text2);margin-top:20px;opacity:0;animation:wlcFadeUp 0.5s ease 0.7s forwards;}
+.wlc-name{font-family:'Syne',sans-serif;font-size:56px;font-weight:700;color:var(--text);letter-spacing:-0.03em;line-height:1;opacity:0;animation:wlcFadeUp 0.6s ease 0.95s forwards;}
+.wlc-name span{color:var(--accent);}
+.wlc-sub{font-family:'DM Mono',monospace;font-size:13px;color:var(--text3);margin-top:20px;opacity:0;animation:wlcFadeUp 0.5s ease 1.3s forwards;}
+.wlc-line{width:60px;height:1px;background:var(--border2);margin:28px auto 0;opacity:0;animation:wlcFadeUp 0.5s ease 1.6s forwards;}
+.wlc-hint{font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);margin-top:14px;letter-spacing:0.1em;opacity:0;animation:wlcPulse 1.5s ease 2s infinite;}
+@keyframes wlcFadeUp{0%{opacity:0;transform:translateY(14px);}100%{opacity:1;transform:translateY(0);}}
+@keyframes wlcPulse{0%,100%{opacity:0.4;}50%{opacity:0.9;}}
+/* grid dots on welcome */
+#welcome-screen::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(74,222,128,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(74,222,128,0.04) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;}
+/* corner accent */
+#welcome-screen::after{content:'';position:absolute;top:0;left:0;width:200px;height:200px;background:radial-gradient(circle at 0 0,rgba(74,222,128,0.08),transparent 70%);pointer-events:none;}
+.wlc-corner-br{position:absolute;bottom:0;right:0;width:200px;height:200px;background:radial-gradient(circle at 100% 100%,rgba(74,222,128,0.06),transparent 70%);pointer-events:none;}
+.container{max-width:940px;margin:0 auto;padding:48px 24px 80px;position:relative;z-index:1;}
+/* NAV */
+.nav{display:flex;gap:4px;margin-bottom:36px;background:var(--bg2);border:1px solid var(--border);border-radius:99px;padding:4px;flex-wrap:wrap;width:fit-content;}
+.nav-btn{font-family:'Syne',sans-serif;font-size:13px;font-weight:500;padding:8px 18px;border-radius:99px;border:none;background:transparent;color:var(--text2);cursor:pointer;transition:all 0.18s;}
+.nav-btn:hover{color:var(--text);}
+.nav-btn.active{background:var(--accent);color:#0d0f0e;font-weight:700;}
+.page{display:none;}.page.active{display:block;}
+/* HEADER */
+.header{margin-bottom:40px;border-bottom:1px solid var(--border);padding-bottom:28px;}
+.header-tag{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.header-tag::before{content:'';width:6px;height:6px;background:var(--accent);border-radius:50%;animation:pulse 2s ease-in-out infinite;}
+.header-name{font-family:'DM Mono',monospace;font-size:12px;color:var(--text2);margin-top:6px;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.5;transform:scale(0.8);}}
+h1{font-size:36px;font-weight:700;letter-spacing:-0.02em;line-height:1.15;margin-bottom:6px;}
+h1 span{color:var(--accent);}
+/* BASE */
+.section{margin-bottom:32px;}
+.section-label{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-bottom:12px;display:flex;align-items:center;gap:10px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:10px;transition:border-color 0.2s;}
+.card:hover{border-color:var(--border2);}
+.card-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.card-body{font-size:13px;color:var(--text2);line-height:1.65;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+/* BADGES */
+.badge{display:inline-block;font-family:'DM Mono',monospace;font-size:10px;font-weight:500;padding:2px 8px;border-radius:99px;letter-spacing:0.04em;}
+.badge-green{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);}
+.badge-red{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);}
+.badge-amber{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border);}
+.badge-blue{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border);}
+.badge-purple{background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-border);}
+.badge-gray{background:rgba(255,255,255,0.04);color:var(--text2);border:1px solid var(--border);}
+/* STAT CARDS */
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 14px;text-align:center;}
+.stat-num{font-size:22px;font-weight:700;color:var(--accent);font-family:'DM Mono',monospace;line-height:1;margin-bottom:5px;}
+.stat-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;font-family:'DM Mono',monospace;}
+/* TABS */
+.tab-row{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;}
+.tab-btn{font-family:'Syne',sans-serif;font-size:12px;font-weight:500;padding:6px 14px;border-radius:99px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;transition:all 0.15s;}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{background:var(--accent);color:#0d0f0e;border-color:var(--accent);font-weight:700;}
+.tab-pane{display:none;}.tab-pane.active{display:block;}
+/* RULES */
+.rule-item{display:flex;gap:14px;padding:10px 0;border-bottom:1px solid var(--border);align-items:flex-start;}
+.rule-item:last-child{border-bottom:none;padding-bottom:0;}
+.rule-n{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);min-width:18px;margin-top:2px;opacity:0.7;}
+.rule-text{font-size:13px;color:var(--text);line-height:1.6;}
+.rule-text strong{color:var(--accent);font-weight:600;}
+.rule-text .muted{color:var(--text2);}
+.rule-text .warn{color:var(--amber);}
+/* CHECKLIST */
+.checklist-item{display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer;}
+.checklist-item:last-child{border-bottom:none;padding-bottom:0;}
+.checklist-item:hover{opacity:0.85;}
+.check-box{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--border2);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all 0.15s;}
+.check-box.checked{background:var(--accent);border-color:var(--accent);}
+.check-box.checked::after{content:'';display:block;width:5px;height:9px;border:2px solid #0d0f0e;border-top:none;border-left:none;transform:rotate(45deg) translate(-1px,-1px);}
+.check-label{font-size:13px;color:var(--text);line-height:1.55;user-select:none;}
+.check-label.done{color:var(--text3);text-decoration:line-through;}
+#checklist-status{margin-top:12px;padding:11px 16px;border-radius:var(--radius-sm);font-size:13px;font-family:'DM Mono',monospace;border:1px solid var(--border);color:var(--text2);text-align:center;transition:all 0.3s;}
+#checklist-status.ready{background:var(--green-bg);border-color:var(--green-border);color:var(--green);}
+/* MATH */
+.math-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.math-row:last-child{border-bottom:none;}
+.math-key{color:var(--text2);}
+.math-val{font-family:'DM Mono',monospace;font-weight:500;color:var(--text);}
+.math-val.pos{color:var(--green);}.math-val.neg{color:var(--red);}.math-val.warn{color:var(--amber);}
+/* STOP */
+.stop-item{display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);}
+.stop-item:last-child{border-bottom:none;}
+.stop-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px;}
+.stop-text{font-size:13px;color:var(--text);line-height:1.55;}
+.stop-text span{color:var(--text2);}
+/* SCHEDULE */
+.schedule-row{display:flex;align-items:flex-start;gap:14px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.schedule-row:last-child{border-bottom:none;}
+.schedule-time{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);min-width:56px;margin-top:2px;}
+/* BOXES */
+.highlight{background:var(--green-bg);border:1px solid var(--green-border);border-radius:var(--radius);padding:16px 20px;margin-bottom:18px;font-size:13px;color:var(--text);line-height:1.7;}
+.warning-box{background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:var(--radius);padding:14px 18px;margin-bottom:10px;font-size:13px;color:var(--text);line-height:1.65;}
+.info-box{background:var(--blue-bg);border:1px solid var(--blue-border);border-radius:var(--radius);padding:14px 18px;margin-bottom:10px;font-size:13px;color:var(--text);line-height:1.65;}
+/* FVG */
+.fvg-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;}
+.fvg-card{border-radius:var(--radius-sm);padding:12px 14px;}
+.fvg-valid{background:var(--green-bg);border:1px solid var(--green-border);}
+.fvg-invalid{background:var(--red-bg);border:1px solid var(--red-border);}
+.fvg-title{font-size:12px;font-weight:600;margin-bottom:6px;}
+.fvg-item{font-size:12px;color:var(--text2);padding:3px 0;}
+/* BTN */
+.btn{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.06em;padding:8px 16px;border:1px solid var(--border2);border-radius:99px;background:transparent;color:var(--text2);cursor:pointer;transition:all 0.15s;text-transform:uppercase;}
+.btn:hover{border-color:var(--accent);color:var(--accent);}
+.btn-primary{background:var(--accent);color:#0d0f0e;border-color:var(--accent);font-weight:700;}
+.btn-primary:hover{opacity:0.85;color:#0d0f0e;}
+.btn-sm{padding:5px 12px;font-size:10px;}
+.btn-danger:hover{border-color:var(--red-border);color:var(--red);}
+/* FORM */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
+.form-group{display:flex;flex-direction:column;gap:5px;}
+.form-group.full{grid-column:1/-1;}
+label{font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:0.08em;text-transform:uppercase;}
+input,select,textarea{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:'Syne',sans-serif;font-size:13px;padding:9px 12px;outline:none;transition:border-color 0.15s;width:100%;}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);}
+select option{background:var(--bg2);}
+textarea{resize:vertical;min-height:60px;}
+/* MODE FILTER */
+.mode-filter{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+.mode-btn{font-family:'DM Mono',monospace;font-size:11px;padding:6px 14px;border-radius:99px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;transition:all 0.15s;letter-spacing:0.04em;}
+.mode-btn:hover{color:var(--text);}
+.mode-btn.active-bt{background:var(--amber-bg);border-color:var(--amber-border);color:var(--amber);}
+.mode-btn.active-dm{background:var(--blue-bg);border-color:var(--blue-border);color:var(--blue);}
+.mode-btn.active-rl{background:var(--green-bg);border-color:var(--green-border);color:var(--green);}
+.mode-btn.active-all{background:var(--bg3);border-color:var(--border2);color:var(--text);}
+/* TABLE */
+.journal-table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:820px;}
+th{font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;padding:10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:9px 10px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--bg3);}
+.r-pos{color:var(--green);font-family:'DM Mono',monospace;font-weight:500;}
+.r-neg{color:var(--red);font-family:'DM Mono',monospace;font-weight:500;}
+.del-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;padding:2px 6px;border-radius:4px;transition:color 0.15s;}
+.del-btn:hover{color:var(--red);}
+.empty-state{text-align:center;padding:36px;color:var(--text3);font-family:'DM Mono',monospace;font-size:12px;}
+/* STAT DASHBOARD */
+.stat-dashboard{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+.big-stat{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:18px 14px;text-align:center;}
+.big-stat-num{font-size:26px;font-weight:700;font-family:'DM Mono',monospace;line-height:1;margin-bottom:6px;}
+.big-stat-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;font-family:'DM Mono',monospace;}
+.cg{color:var(--green);}.cr{color:var(--red);}.ca{color:var(--amber);}.cb{color:var(--blue);}
+/* BREAKDOWN */
+.breakdown-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.breakdown-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;}
+.breakdown-title{font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:12px;}
+.brow{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.brow:last-child{border-bottom:none;}
+.bkey{color:var(--text2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bval{font-family:'DM Mono',monospace;font-weight:500;}
+/* CHART CANVAS */
+.chart-wrap{position:relative;margin-top:8px;}
+canvas.chart{display:block;width:100%;}
+/* STREAK */
+.streak-row{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;}
+.streak-dot{width:14px;height:14px;border-radius:3px;flex-shrink:0;}
+/* PROGRESS BAR */
+.prog-wrap{margin-top:8px;}
+.prog-label{display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);margin-bottom:5px;}
+.prog-bg{background:var(--bg3);border-radius:99px;height:6px;overflow:hidden;}
+.prog-fill{height:100%;border-radius:99px;transition:width 0.5s;background:var(--accent);}
+/* SETTINGS */
+.settings-group{margin-bottom:24px;}
+.settings-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);gap:16px;}
+.settings-row:last-child{border-bottom:none;}
+.settings-key{font-size:13px;color:var(--text2);flex:1;}
+.settings-key small{display:block;font-size:11px;color:var(--text3);margin-top:2px;font-family:'DM Mono',monospace;}
+.settings-input{width:200px;flex-shrink:0;}
+/* CALENDAR */
+.cal-day{margin-bottom:16px;}
+.cal-day-header{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);padding:8px 0 8px;border-bottom:1px solid var(--border);margin-bottom:8px;display:flex;align-items:center;gap:10px;}
+.cal-day-header.today{color:var(--accent);}
+.cal-day-header .today-badge{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);font-size:9px;padding:1px 6px;border-radius:99px;}
+.cal-event{display:flex;align-items:flex-start;gap:12px;padding:10px 14px;border-radius:var(--radius-sm);margin-bottom:6px;border:1px solid var(--border);background:var(--bg2);transition:border-color 0.15s;}
+.cal-event:hover{border-color:var(--border2);}
+.cal-event.high{border-left:3px solid var(--red);background:var(--red-bg);}
+.cal-event.medium{border-left:3px solid var(--amber);background:var(--amber-bg);}
+.cal-event.low{border-left:3px solid var(--border2);}
+.cal-event-time{font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);min-width:48px;margin-top:2px;}
+.cal-event-body{flex:1;}
+.cal-event-name{font-size:13px;font-weight:500;color:var(--text);margin-bottom:3px;}
+.cal-event-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.cal-event-country{font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);}
+.cal-event-impact{font-size:10px;font-family:'DM Mono',monospace;}
+.cal-event-values{display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;}
+.cal-val{font-family:'DM Mono',monospace;font-size:11px;}
+.cal-val span{color:var(--text3);}
+.cal-avoid-badge{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);font-size:9px;padding:1px 6px;border-radius:99px;font-family:'DM Mono',monospace;}
+.cal-empty{text-align:center;padding:32px;color:var(--text3);font-family:'DM Mono',monospace;font-size:12px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.grid2,.grid3,.grid4,.stat-dashboard,.breakdown-grid,.form-grid,.fvg-grid{grid-template-columns:1fr;}h1{font-size:26px;}.nav{border-radius:12px;}.big-stat-num{font-size:20px;}.settings-row{flex-direction:column;align-items:flex-start;}.settings-input{width:100%;}}
+@media print{body{background:white;color:black;}body::before{display:none;}.btn,.nav,.mode-filter{display:none;}.page{display:block!important;}:root{--bg:white;--bg2:#f8f8f8;--bg3:#f0f0f0;--border:#ddd;--border2:#ccc;--text:#111;--text2:#555;--text3:#888;--green:#16a34a;--green-bg:#f0fdf4;--green-border:#bbf7d0;--red:#dc2626;--red-bg:#fef2f2;--red-border:#fecaca;--amber:#d97706;--amber-bg:#fffbeb;--amber-border:#fde68a;--blue:#2563eb;--blue-bg:#eff6ff;--blue-border:#bfdbfe;--accent:#16a34a;}}
+</style>
+</head>
+<body>
+<div id="welcome-screen" onclick="dismissWelcome()">
+  <div class="wlc-corner-br"></div>
+  <div class="wlc-tag">Trading Plan</div>
+  <div class="wlc-greeting">Bine ai revenit,</div>
+  <div class="wlc-name" id="wlc-name">SMC <span>Trader</span></div>
+  <div class="wlc-sub" id="wlc-sub">SMC Liquidity Flow · Versiune Finală</div>
+  <div class="wlc-line"></div>
+  <div class="wlc-hint">click pentru a continua</div>
+</div>
+<div class="container">
+
+<div class="header">
+  <div class="header-tag" id="hdr-tag">Trading Plan — Versiune Finală</div>
+  <h1 id="hdr-title">SMC <span>Liquidity</span> Flow</h1>
+  <div id="hdr-sub" style="color:var(--text2);font-size:13px;font-family:'DM Mono',monospace;">Smart Money Concepts · Instituțional · DAX40 · UK100</div>
+  <div class="header-name" id="hdr-name"></div>
+</div>
+
+<div class="nav">
+  <button class="nav-btn active" onclick="goPage('plan',this)">Plan</button>
+  <button class="nav-btn" onclick="goPage('definitii',this)">Definiții</button>
+  <button class="nav-btn" onclick="goPage('invatare',this)">Învățare</button>
+  <button class="nav-btn" onclick="goPage('jurnal',this)">Jurnal</button>
+  <button class="nav-btn" onclick="goPage('statistici',this)">Statistici</button>
+  <button class="nav-btn" onclick="goPage('calendar',this)">Calendar</button>
+  <button class="nav-btn" onclick="goPage('setari',this)">Setări</button>
+</div>
+
+<!-- ═══════════════════════════════ PLAN ═══════════════════════════════ -->
+<div id="page-plan" class="page active">
+  <div class="section">
+    <div class="section-label">Principii de bază</div>
+    <div class="highlight">
+      <strong>Regula #1:</strong> Piața se mișcă pe lichiditate — nu pe indicatori.<br>
+      <strong>Regula #2:</strong> Urmăresc instituțiile — intru acolo unde intră băncile, nu unde intră retailul.<br>
+      <strong>Regula #3:</strong> Dacă strategia nu poate fi testată, nu este o strategie.<br>
+      <strong>Regula #4:</strong> Procesul și execuția corectă contează mai mult decât rezultatul unui singur trade.
+    </div>
+    <div class="grid4">
+      <div class="stat-card"><div class="stat-num" id="disp-rr">1:2</div><div class="stat-label">R:R minim</div></div>
+      <div class="stat-card"><div class="stat-num" id="disp-risc">1%</div><div class="stat-label">Risc / trade</div></div>
+      <div class="stat-card"><div class="stat-num">34%</div><div class="stat-label">WR break-even</div></div>
+      <div class="stat-card"><div class="stat-num" id="disp-target">150</div><div class="stat-label">Target backtest</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Active tranzacționate</div>
+    <div class="grid2">
+      <div class="card"><div class="card-title"><span class="badge badge-green">PRINCIPAL</span> DAX40 / GER40</div><div class="card-body">Lichiditate excelentă, mișcări clare, spread mic. Prioritate maximă.</div></div>
+      <div class="card"><div class="card-title"><span class="badge badge-green">PRINCIPAL</span> UK100 / FTSE100</div><div class="card-body">Structură curată, corelat cu DAX. Util pentru confirmare încrucișată.</div></div>
+      <div class="card"><div class="card-title"><span class="badge badge-amber">SECUNDAR</span> NAS100 / Nasdaq</div><div class="card-body">Adaugă-l după <span id="disp-target2">150</span> trade-uri backtested pe DAX și UK100.</div></div>
+      <div class="card"><div class="card-title"><span class="badge badge-amber">SECUNDAR</span> SPX500 / S&P 500</div><div class="card-body">Util ca referință macro. Nu activ principal la început.</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Analiza top-down — obligatorie înainte de orice sesiune</div>
+    <div class="card">
+      <div class="rule-item"><div class="rule-n">W</div><div class="rule-text"><strong>Weekly:</strong> Pool-uri de lichiditate majore. Previous week high/low. Spre ce target major se îndreaptă prețul săptămâna aceasta?</div></div>
+      <div class="rule-item"><div class="rule-n">D</div><div class="rule-text"><strong>Daily:</strong> Previous day high/low — filtrul tău principal de lichiditate. Prețul în premium sau discount față de range-ul zilei precedente?</div></div>
+      <div class="rule-item"><div class="rule-n">H1</div><div class="rule-text"><strong>H1:</strong> Bias-ul zilei — bullish (HH+HL) sau bearish (LH+LL)? London high/low unde se află? Ce lichiditate a fost deja luată?</div></div>
+      <div class="rule-item"><div class="rule-n">M15</div><div class="rule-text"><strong>M15/M5:</strong> Execuție. Cauți sweep, displacement, FVG valid și MSS strict definit.</div></div>
+    </div>
+    <div class="info-box" style="margin-top:10px;">
+      <strong>Tip de zi — proces în 2 pași:</strong><br>
+      <span style="color:var(--text2);font-size:12px;">Pas 1 (înainte de sesiune):</span> Stabilești bias-ul din top-down — direcție probabilă.<br>
+      <span style="color:var(--text2);font-size:12px;">Pas 2 (primele 30 min — nu execuți, doar observi):</span> Confirmi sau infirmi bias-ul pe grafic live.<br><br>
+      <span class="badge badge-green" style="margin-right:6px;">Trend Day</span> Mișcare direcțională clară — ambele setup-uri funcționează.<br>
+      <span class="badge badge-amber" style="margin-right:6px;margin-top:6px;">Reversal Day</span> Sweep major HTF — Setup 1 prioritar.<br>
+      <span class="badge badge-red" style="margin-right:6px;margin-top:6px;">Range Day</span> Nu se confirmă direcție în 30 min — <strong>nu tranzacționezi.</strong>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Sesiuni de tranzacționare</div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title"><span class="badge badge-purple">LONDON</span> Când ești liber</div>
+        <div class="schedule-row"><div class="schedule-time">09:30</div><div>Analiză pre-sesiune — top-down, bias zilei, lichidități</div></div>
+        <div class="schedule-row"><div class="schedule-time">10:00</div><div style="color:var(--amber);">● Observi 30 min — confirmi tip zi, nu execuți</div></div>
+        <div class="schedule-row"><div class="schedule-time">10:30</div><div style="color:var(--accent);font-weight:600;">▶ Start fereastră execuție</div></div>
+        <div class="schedule-row"><div class="schedule-time">12:00</div><div>Ultimul trade permis</div></div>
+        <div class="schedule-row"><div class="schedule-time" style="color:var(--red);">12:30</div><div style="color:var(--red);">■ Închizi platforma</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="badge badge-blue">NYSE OPEN</span> Zilnic după școală</div>
+        <div class="schedule-row"><div class="schedule-time">15:30</div><div>Analiză pre-sesiune — top-down, ce a făcut London</div></div>
+        <div class="schedule-row"><div class="schedule-time">16:00</div><div style="color:var(--amber);">● Observi 30 min — confirmi tip zi, nu execuți</div></div>
+        <div class="schedule-row"><div class="schedule-time">16:30</div><div style="color:var(--accent);font-weight:600;">▶ Start fereastră execuție</div></div>
+        <div class="schedule-row"><div class="schedule-time">18:30</div><div>Ultimul trade permis</div></div>
+        <div class="schedule-row"><div class="schedule-time" style="color:var(--red);">19:00</div><div style="color:var(--red);">■ Închizi platforma</div></div>
+      </div>
+    </div>
+    <div class="warning-box" style="margin-top:4px;">
+      <strong>Regula zilnică:</strong> Limita (1 loss / 2 wins) se aplică per zi totală — nu per sesiune. Dacă ai pierdut la London, nu mai tranzacționezi la NYSE.<br>
+      <span style="color:var(--text2);font-size:12px;">Notă asumată: Ambele sesiuni implică risc de oboseală și bias carry-over — decizie luată conștient, reevaluată după 150 trade-uri.</span>
+    </div>
+    <div class="card" style="margin-top:0;">
+      <div class="card-title">Zile de evitat</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;">
+        <span class="badge badge-red">Luni</span><span class="badge badge-red">Vineri 17:00+</span><span class="badge badge-red">NFP</span><span class="badge badge-red">CPI</span><span class="badge badge-red">Fed Rate</span><span class="badge badge-red">Holidays US/UK</span><span class="badge badge-green">Marți–Joi ✓</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Setup-uri permise</div>
+    <div class="tab-row">
+      <button class="tab-btn active" onclick="showSetup('s1',this)">Setup 1 — Sweep + MSS</button>
+      <button class="tab-btn" onclick="showSetup('s2',this)">Setup 2 — FVG Retest</button>
+    </div>
+    <div id="s1" class="tab-pane active">
+      <div class="card">
+        <div class="card-title">Sweep of Liquidity + Market Structure Shift</div>
+        <div style="margin-top:10px;">
+          <div class="rule-item"><div class="rule-n">01</div><div class="rule-text">Identifici un <strong>nivel clar de lichiditate</strong> — previous day high/low, London high/low, equal highs/lows pe H1 sau Daily.</div></div>
+          <div class="rule-item"><div class="rule-n">02</div><div class="rule-text">Prețul face <strong>sweep</strong> — penetrează nivelul, ia lichiditatea, rejectează agresiv. <span class="muted">(Wick lung cu close înapoi în range)</span></div></div>
+          <div class="rule-item"><div class="rule-n">03</div><div class="rule-text">Apare <strong>displacement</strong> — impuls clar și rapid, nu mișcare lentă. Lumânare decisivă fără ezitare. <span class="warn">Dacă trebuie să te gândești dacă e displacement — nu este.</span></div></div>
+          <div class="rule-item"><div class="rule-n">04</div><div class="rule-text"><strong>MSS strict:</strong> break + close peste swing-ul anterior + displacement. Toate trei obligatorii. Doar wick = invalid.</div></div>
+          <div class="rule-item"><div class="rule-n">05</div><div class="rule-text">Identifici <strong>FVG valid</strong> creat de displacement pe M5/M15 — după impuls puternic, nu în mijlocul unui range.</div></div>
+          <div class="rule-item"><div class="rule-n">06</div><div class="rule-text"><strong>Intrare:</strong> la retestul FVG (50%–75%). Limită order plasat în avans.</div></div>
+          <div class="rule-item"><div class="rule-n">07</div><div class="rule-text"><strong>SL:</strong> sub/deasupra sweep-ului +2–5 pips. <strong>TP:</strong> next liquidity pool definit, minim <span id="disp-rr2">2</span>R.</div></div>
+        </div>
+      </div>
+    </div>
+    <div id="s2" class="tab-pane">
+      <div class="card">
+        <div class="card-title">FVG Retest în direcția trendului instituțional</div>
+        <div style="margin-top:10px;">
+          <div class="rule-item"><div class="rule-n">01</div><div class="rule-text">Confirmi <strong>trendul pe H1</strong> — HH+HL (bullish) sau LH+LL (bearish), aliniat cu bias-ul Daily.</div></div>
+          <div class="rule-item"><div class="rule-n">02</div><div class="rule-text"><strong>FVG valid</strong> — format după displacement puternic, în zona de discount (long) sau premium (short). <span class="warn">FVG în mijlocul range-ului = ignorat.</span></div></div>
+          <div class="rule-item"><div class="rule-n">03</div><div class="rule-text">FVG-ul este în zona unui <strong>nivel de lichiditate definit</strong> — previous day H/L sau London H/L.</div></div>
+          <div class="rule-item"><div class="rule-n">04</div><div class="rule-text">Pullback spre FVG fără a rupe structura majoră. <strong>MSS pe M5</strong> confirmă oprirea — break + close + displacement.</div></div>
+          <div class="rule-item"><div class="rule-n">05</div><div class="rule-text"><strong>Intrare:</strong> 50%–75% al FVG. Limită order în avans. <strong>SL:</strong> sub FVG complet. <strong>TP:</strong> next pool, minim <span id="disp-rr3">2</span>R.</div></div>
+          <div class="rule-item"><div class="rule-n">⚠</div><div class="rule-text"><span class="muted">INVALIDARE:</span> close complet în interiorul FVG fără rejecție → ieși imediat.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Checklist de intrare <button class="btn btn-sm btn-danger" onclick="resetChecklist()" style="margin-left:8px;">Reset</button></div>
+    <div class="card">
+      <div id="checklist">
+        <div class="checklist-item" onclick="toggleCheck(this)"><div class="check-box"></div><div class="check-label">Am făcut analiza top-down (Weekly → Daily → H1)</div></div>
+        <div class="checklist-item" onclick="toggleCheck(this)"><div class="check-box"></div><div class="check-label">Am observat 30 min — tipul de zi confirmat, <strong>NU este Range Day</strong></div></div>
+        <div class="checklist-item" onclick="toggleCheck(this)"><div class="check-box"></div><div class="check-label">Bias H1 clar — bullish sau bearish, aliniat cu Daily</div></div>
+        <div class="checklist-item" onclick="toggleCheck(this)"><div class="check-box"></div><div class="check-label">Nivelul de lichiditate definit — previous day H/L sau London H/L</div></div>
+        <div class="checklist-item" onclick="toggleCheck(this)"><div class="check-box"></div><div class="check-label">Sweep confirmat — wick + close înapoi în range</div></div>
+        <div class="checklist-item" onclick="toggleCheck(this)"><div class="check-box"></div><div class="check-label">Displacement valid — impuls clar și rapid, fără dubii</div></div>
+        <div class="checklist-item" onclick="toggleCheck(this)"><div class="check-box"></div><div class="check-label">MSS strict — break + close + displacement. Toate trei prezente.</div></div>
+        <div class="checklist-item" onclick="toggleCheck(this)"><div class="check-box"></div><div class="check-label">FVG valid — după displacement puternic, <strong>NU</strong> în mijlocul unui range</div></div>
+        <div class="checklist-item" onclick="toggleCheck(this)"><div class="check-box"></div><div class="check-label">SL calculat și poziționat <strong>înainte</strong> de click</div></div>
+        <div class="checklist-item" onclick="toggleCheck(this)"><div class="check-box"></div><div class="check-label">Suntem în fereastra activă (10:30–12:00 sau 16:30–18:30)</div></div>
+        <div class="checklist-item" onclick="toggleCheck(this)"><div class="check-box"></div><div class="check-label">Nu este zi cu news major — nu Luni, nu Vineri seară</div></div>
+        <div class="checklist-item" onclick="toggleCheck(this)"><div class="check-box"></div><div class="check-label">Nu am atins limita zilnică (1 loss sau 2 wins pe întreaga zi)</div></div>
+      </div>
+      <div id="checklist-status">0 / 12 condiții bifate</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Management capital</div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Reguli fixe</div>
+        <div class="math-row"><div class="math-key">Risc per trade</div><div class="math-val" id="disp-risc2">0.5% – 1%</div></div>
+        <div class="math-row"><div class="math-key">R:R minim</div><div class="math-val pos" id="disp-rr4">1 : 2</div></div>
+        <div class="math-row"><div class="math-key">Wins max / zi</div><div class="math-val">2 → închizi platforma</div></div>
+        <div class="math-row"><div class="math-key">Losses max / zi</div><div class="math-val neg">1 → închizi platforma</div></div>
+        <div class="math-row"><div class="math-key">Losses max / săpt.</div><div class="math-val neg">−3% cont → pauză</div></div>
+        <div class="math-row"><div class="math-key">SL fizic</div><div class="math-val pos">Obligatoriu — mereu</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Matematica pe termen lung</div>
+        <div class="math-row"><div class="math-key">WR necesar break-even</div><div class="math-val warn">34%</div></div>
+        <div class="math-row"><div class="math-key">WR realist SMC</div><div class="math-val pos">45–55%</div></div>
+        <div class="math-row"><div class="math-key">Expectanță la 50% WR</div><div class="math-val pos">+0.5R / trade</div></div>
+        <div class="math-row"><div class="math-key">150 trade-uri estimat</div><div class="math-val pos">+75R net</div></div>
+        <div class="math-row"><div class="math-key">10 pierderi consecutive</div><div class="math-val neg">−9.6% cont</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Reguli de stop</div>
+    <div class="card">
+      <div class="stop-item"><div class="stop-dot" style="background:var(--red);"></div><div class="stop-text"><strong>1 trade pierdut / zi</strong> — închizi platforma imediat. <span>Valabil pentru ambele sesiuni cumulate.</span></div></div>
+      <div class="stop-item"><div class="stop-dot" style="background:var(--green);"></div><div class="stop-text"><strong>2 trade-uri câștigate / zi</strong> — închizi platforma. <span>Protejezi profitul, nu lăcomie.</span></div></div>
+      <div class="stop-item"><div class="stop-dot" style="background:var(--amber);"></div><div class="stop-text"><strong>Ora limită sesiunii</strong> — 12:30 sau 19:00. <span>Indiferent de situație.</span></div></div>
+      <div class="stop-item"><div class="stop-dot" style="background:var(--red);"></div><div class="stop-text"><strong>−3% / săptămână</strong> — pauză până luni. <span>Revizuiești jurnalul, nu recuperezi.</span></div></div>
+      <div class="stop-item"><div class="stop-dot" style="background:var(--amber);"></div><div class="stop-text"><strong>Stare emoțională alterată</strong> — furie / panică / euforie → închizi imediat.</div></div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+    <button class="btn" onclick="window.print()">⎙ Printează / PDF</button>
+    <button class="btn" onclick="goPage('jurnal',document.querySelectorAll('.nav-btn')[2])">→ Jurnal</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ DEFINIȚII ═══════════════════════════════ -->
+<div id="page-definitii" class="page">
+  <div class="section">
+    <div class="section-label">Definiții stricte</div>
+    <div class="info-box">Dacă un element nu respectă definiția exactă de mai jos — nu există. Nu îl interpretezi, nu îl forțezi.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Pool-uri de lichiditate valide</div>
+    <div class="card">
+      <div class="rule-item"><div class="rule-n">1</div><div class="rule-text"><strong>Previous Day High / Low</strong> — cel mai important filtru zilnic. Sweep-ul acestui nivel = confirmare instituțională.</div></div>
+      <div class="rule-item"><div class="rule-n">2</div><div class="rule-text"><strong>London Session High / Low</strong> — pentru sesiunea NYSE, London H/L este nivelul principal care poate fi luat.</div></div>
+      <div class="rule-item"><div class="rule-n">3</div><div class="rule-text"><strong>Previous Week High / Low</strong> — target major săptămânal. Folosit pentru TP și context macro.</div></div>
+      <div class="rule-item"><div class="rule-n">4</div><div class="rule-text"><strong>Equal Highs / Equal Lows</strong> — minim 2 swing-uri la același nivel pe H1 sau M15. Vizibile clar, fără interpretare.</div></div>
+      <div class="rule-item"><div class="rule-n">✗</div><div class="rule-text"><span class="muted">NU sunt valide:</span> swing-uri random pe M5, niveluri aproximative, zone pe care doar tu le vezi.</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">MSS — definiție strictă</div>
+    <div class="card">
+      <div class="card-title">Toate 3 obligatorii simultan</div>
+      <div class="rule-item"><div class="rule-n">1</div><div class="rule-text"><strong>Break</strong> — prețul depășește swing-ul anterior relevant pe M5/M15.</div></div>
+      <div class="rule-item"><div class="rule-n">2</div><div class="rule-text"><strong>Close</strong> — lumânarea se închide dincolo de acel swing. Wick care trece și revine = invalid.</div></div>
+      <div class="rule-item"><div class="rule-n">3</div><div class="rule-text"><strong>Displacement</strong> — impuls clar și rapid, nu mișcare lentă. Dacă nu e evident, nu e displacement.</div></div>
+      <div style="margin-top:12px;padding:12px 14px;background:var(--red-bg);border:1px solid var(--red-border);border-radius:var(--radius-sm);">
+        <div style="font-size:12px;color:var(--red);font-weight:600;margin-bottom:4px;">❌ NU este MSS dacă:</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.7;">— Doar wick trece de swing, body rămâne înapoi<br>— Break lent fără impuls clar<br>— Ai dubii — dacă nu e evident, nu există</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">FVG — valid vs invalid</div>
+    <div class="fvg-grid">
+      <div class="fvg-card fvg-valid">
+        <div class="fvg-title" style="color:var(--green);">✓ FVG Valid</div>
+        <div class="fvg-item">— Format după displacement puternic</div>
+        <div class="fvg-item">— În discount (long) sau premium (short)</div>
+        <div class="fvg-item">— Aliniat cu nivel de lichiditate definit</div>
+        <div class="fvg-item">— Pe M5 sau M15, vizibil clar</div>
+        <div class="fvg-item">— Primul retest după formare</div>
+      </div>
+      <div class="fvg-card fvg-invalid">
+        <div class="fvg-title" style="color:var(--red);">✗ FVG Invalid</div>
+        <div class="fvg-item">— În mijlocul unui dealing range</div>
+        <div class="fvg-item">— După mișcare slabă, fără displacement</div>
+        <div class="fvg-item">— Deja restat de mai multe ori</div>
+        <div class="fvg-item">— Contrar bias-ului H1 și Daily</div>
+        <div class="fvg-item">— Ai dubii — ignoră-l</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Tip de zi — identificare în 2 pași</div>
+    <div class="info-box" style="margin-bottom:12px;">
+      <strong>Pas 1 (înainte):</strong> Bias din top-down — direcție probabilă, nu decizie finală.<br>
+      <strong>Pas 2 (primele 30 min — nu execuți):</strong> Confirmi pe grafic live. Dacă nu ești sigur după 30 min = Range Day.
+    </div>
+    <div class="card">
+      <div class="rule-item"><div class="rule-n" style="color:var(--green);">T</div><div class="rule-text"><strong style="color:var(--green);">Trend Day</strong> — mișcare direcțională clară din primele 30 min. Ambele setup-uri funcționează. <span class="muted">Semn: open aproape de high/low zilei precedente.</span></div></div>
+      <div class="rule-item"><div class="rule-n" style="color:var(--amber);">R</div><div class="rule-text"><strong style="color:var(--amber);">Reversal Day</strong> — sweep major HTF în primele 30 min + rejecție puternică. Setup 1 prioritar. <span class="muted">Semn: open în premium/discount extrem față de weekly.</span></div></div>
+      <div class="rule-item"><div class="rule-n" style="color:var(--red);">X</div><div class="rule-text"><strong style="color:var(--red);">Range Day</strong> — fără direcție după 30 min, false breakout-uri. <strong>Nu tranzacționezi.</strong> <span class="muted">Dacă nu ești sigur — tratezi ca Range Day.</span></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ ÎNVĂȚARE ═══════════════════════════════ -->
+<div id="page-invatare" class="page">
+  <div class="section">
+    <div class="section-label">Plan de învățare — SMC Liquidity Flow</div>
+    <div class="highlight">Parcurge modulele <strong>în ordine</strong>. Bifează fiecare video după ce îl vizionezi. Poți adăuga oricând link-uri noi la orice modul.</div>
+  </div>
+  <div class="section">
+    <div class="section-label">Progres general</div>
+    <div class="grid4">
+      <div class="stat-card"><div class="stat-num cg" id="lrn-watched">0</div><div class="stat-label">Vizionate</div></div>
+      <div class="stat-card"><div class="stat-num ca" id="lrn-total">0</div><div class="stat-label">Total videos</div></div>
+      <div class="stat-card"><div class="stat-num cb" id="lrn-pct">0%</div><div class="stat-label">Completat</div></div>
+      <div class="stat-card"><div class="stat-num" id="lrn-mods">0/0</div><div class="stat-label">Module finalizate</div></div>
+    </div>
+  </div>
+  <div id="lrn-container"></div>
+  <div id="lrn-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:28px;width:min(460px,92vw);">
+      <div style="font-size:14px;font-weight:600;margin-bottom:16px;color:var(--text);">+ Adauga videoclip</div>
+      <div class="form-group" style="margin-bottom:10px;"><label>Titlu</label><input type="text" id="lrn-inp-title" placeholder="ex: SMC Lichiditate explicata"></div>
+      <div class="form-group" style="margin-bottom:16px;"><label>Link YouTube</label><input type="url" id="lrn-inp-url" placeholder="https://youtube.com/watch?v=..."></div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-primary" onclick="lrnSaveVideo()">Salveaza</button>
+        <button class="btn" onclick="lrnCloseModal()">Anuleaza</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ JURNAL ═══════════════════════════════ -->
+<div id="page-jurnal" class="page">
+  <div class="section">
+    <div class="section-label">Adaugă trade nou</div>
+    <div class="card">
+      <div class="form-grid">
+        <div class="form-group"><label>Data</label><input type="date" id="f-data"></div>
+        <div class="form-group"><label>Tip sesiune</label>
+          <select id="f-mode"><option value="">Selectează...</option><option value="Backtesting">📊 Backtesting</option><option value="Demo">🔵 Demo</option><option value="Real">🟢 Real</option></select>
+        </div>
+        <div class="form-group"><label>Market</label>
+          <select id="f-market"><option value="">Selectează...</option><option>DAX40</option><option>UK100</option><option>NAS100</option><option>SPX500</option></select>
+        </div>
+        <div class="form-group"><label>Setup folosit</label>
+          <select id="f-setup"><option value="">Selectează...</option><option value="Setup 1 — Sweep+MSS">Setup 1 — Sweep+MSS</option><option value="Setup 2 — FVG Retest">Setup 2 — FVG Retest</option></select>
+        </div>
+        <div class="form-group"><label>Sesiunea</label>
+          <select id="f-sesiune"><option value="">Selectează...</option><option>London (10:30–12:00)</option><option>NYSE Open (16:30–18:30)</option></select>
+        </div>
+        <div class="form-group"><label>Tip zi</label>
+          <select id="f-tipzi"><option value="">Selectează...</option><option value="Trend Day">Trend Day</option><option value="Reversal Day">Reversal Day</option><option value="Range Day">Range Day</option></select>
+        </div>
+        <div class="form-group"><label>Direcție</label>
+          <select id="f-directie"><option value="">Selectează...</option><option>Long</option><option>Short</option></select>
+        </div>
+        <div class="form-group"><label>Lichiditate luată</label>
+          <select id="f-lichid"><option value="">Selectează...</option><option>Previous Day High</option><option>Previous Day Low</option><option>London High</option><option>London Low</option><option>Equal Highs</option><option>Equal Lows</option><option>Weekly High/Low</option></select>
+        </div>
+        <div class="form-group"><label>Risc asumat (%)</label><input type="number" id="f-risc" placeholder="0.5 sau 1" step="0.1" min="0" max="5"></div>
+        <div class="form-group"><label>Rezultat (R) — ex: 2.1 sau -1</label><input type="number" id="f-rezultat" placeholder="ex: 2.1 sau -1" step="0.1"></div>
+        <div class="form-group"><label>Reguli respectate?</label>
+          <select id="f-reguli"><option value="">Selectează...</option><option value="Da">✓ Da</option><option value="Partial">~ Parțial</option><option value="Nu">✗ Nu</option></select>
+        </div>
+        <div class="form-group"><label>Emoție / stare</label>
+          <select id="f-emotie"><option value="">Selectează...</option><option>Calm / neutru</option><option>Încrezător</option><option>Nesigur</option><option>Emoționat / euforic</option><option>Frustrat</option></select>
+        </div>
+        <div class="form-group full"><label>Notă</label><textarea id="f-nota" placeholder="Ce ai observat? Ce ai face diferit?"></textarea></div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="addTrade()">+ Adaugă trade</button>
+        <span id="form-msg" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text3);"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Filtrează după tip</div>
+    <div class="mode-filter">
+      <button class="mode-btn active-all" onclick="setModeFilter('all',this)">Toate</button>
+      <button class="mode-btn" onclick="setModeFilter('Backtesting',this)">📊 Backtesting</button>
+      <button class="mode-btn" onclick="setModeFilter('Demo',this)">🔵 Demo</button>
+      <button class="mode-btn" onclick="setModeFilter('Real',this)">🟢 Real</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Trade-uri (<span id="trade-count">0</span>) <button class="btn btn-sm btn-danger" onclick="clearAll()" style="margin-left:8px;">Șterge tot</button></div>
+    <div class="card" style="padding:0;">
+      <div class="journal-table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Tip</th><th>Data</th><th>Market</th><th>Setup</th><th>Sesiune</th><th>Tip zi</th><th>Dir.</th><th>Risc%</th><th>Rezultat</th><th>Reguli</th><th>Emoție</th><th></th></tr></thead>
+          <tbody id="journal-body"><tr><td colspan="13" class="empty-state">Niciun trade înregistrat.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ STATISTICI ═══════════════════════════════ -->
+<div id="page-statistici" class="page">
+
+  <div class="section">
+    <div class="section-label">Filtrează statisticile</div>
+    <div class="mode-filter">
+      <button class="mode-btn active-all" onclick="setStatFilter('all',this)">Toate</button>
+      <button class="mode-btn" onclick="setStatFilter('Backtesting',this)">📊 Backtesting</button>
+      <button class="mode-btn" onclick="setStatFilter('Demo',this)">🔵 Demo</button>
+      <button class="mode-btn" onclick="setStatFilter('Real',this)">🟢 Real</button>
+    </div>
+  </div>
+
+  <!-- PROGRESS BACKTESTING -->
+  <div class="section">
+    <div class="section-label">Progres per tip</div>
+    <div class="grid3">
+      <div class="card">
+        <div class="card-title" style="color:var(--amber);">📊 Backtesting</div>
+        <div class="prog-wrap">
+          <div class="prog-label"><span id="prog-bt-n">0</span><span id="prog-bt-target">/ 150</span></div>
+          <div class="prog-bg"><div class="prog-fill" id="prog-bt-fill" style="width:0%;background:var(--amber);"></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="color:var(--blue);">🔵 Demo</div>
+        <div class="prog-wrap">
+          <div class="prog-label"><span id="prog-dm-n">0</span><span id="prog-dm-target">/ 50</span></div>
+          <div class="prog-bg"><div class="prog-fill" id="prog-dm-fill" style="width:0%;background:var(--blue);"></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="color:var(--green);">🟢 Real</div>
+        <div class="prog-wrap">
+          <div class="prog-label"><span id="prog-rl-n">0</span><span id="prog-rl-target">/ 50</span></div>
+          <div class="prog-bg"><div class="prog-fill" id="prog-rl-fill" style="width:0%;background:var(--green);"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="section">
+    <div class="section-label">Date generale</div>
+    <div class="stat-dashboard">
+      <div class="big-stat"><div class="big-stat-num cb" id="st-total">0</div><div class="big-stat-label">Total trades</div></div>
+      <div class="big-stat"><div class="big-stat-num cg" id="st-wr">—</div><div class="big-stat-label">Win Rate</div></div>
+      <div class="big-stat"><div class="big-stat-num" id="st-rnet">—</div><div class="big-stat-label">R net total</div></div>
+      <div class="big-stat"><div class="big-stat-num ca" id="st-exp">—</div><div class="big-stat-label">Expectanță / trade</div></div>
+    </div>
+    <div class="grid4">
+      <div class="stat-card"><div class="stat-num cg" id="st-wins">0</div><div class="stat-label">Câștigate</div></div>
+      <div class="stat-card"><div class="stat-num cr" id="st-losses">0</div><div class="stat-label">Pierdute</div></div>
+      <div class="stat-card"><div class="stat-num" id="st-avg-win">—</div><div class="stat-label">R mediu Win</div></div>
+      <div class="stat-card"><div class="stat-num" id="st-avg-loss">—</div><div class="stat-label">R mediu Loss</div></div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="section">
+    <div class="section-label">Win Rate per Setup</div>
+    <div class="card"><div class="chart-wrap"><canvas id="chart-setup" class="chart" height="120"></canvas></div><div id="chart-setup-empty" class="empty-state" style="padding:24px;">Date insuficiente</div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Win Rate per Sesiune</div>
+    <div class="card"><div class="chart-wrap"><canvas id="chart-session" class="chart" height="120"></canvas></div><div id="chart-session-empty" class="empty-state" style="padding:24px;">Date insuficiente</div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Streak-uri — ultimele 30 trade-uri</div>
+    <div class="card">
+      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);"><div style="width:12px;height:12px;border-radius:2px;background:var(--green);"></div>Win</div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);"><div style="width:12px;height:12px;border-radius:2px;background:var(--red);"></div>Loss</div>
+      </div>
+      <div class="streak-row" id="streak-dots"><div style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px;">Niciun trade încă</div></div>
+      <div style="margin-top:10px;display:flex;gap:20px;flex-wrap:wrap;">
+        <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2);">Max win streak: <span id="st-max-win" style="color:var(--green);font-weight:500;">—</span></div>
+        <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2);">Max loss streak: <span id="st-max-loss" style="color:var(--red);font-weight:500;">—</span></div>
+        <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2);">Streak curent: <span id="st-cur-streak" style="font-weight:500;">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CURBA DE CAPITAL -->
+  <div class="section">
+    <div class="section-label">Curba de capital (R cumulat)</div>
+    <div class="card" style="padding:16px 20px;">
+      <canvas id="eq-canvas" style="width:100%;display:none;"></canvas>
+      <div id="eq-empty" class="empty-state">Adaugă trade-uri pentru a vedea curba de capital</div>
+    </div>
+  </div>
+
+  <!-- BREAKDOWN -->
+  <div class="breakdown-grid">
+    <div class="breakdown-card"><div class="breakdown-title">Pe setup</div><div id="st-by-setup"><p style="color:var(--text3);font-size:12px;font-family:'DM Mono',monospace;">Date insuficiente</p></div></div>
+    <div class="breakdown-card"><div class="breakdown-title">Pe market</div><div id="st-by-market"><p style="color:var(--text3);font-size:12px;font-family:'DM Mono',monospace;">Date insuficiente</p></div></div>
+    <div class="breakdown-card"><div class="breakdown-title">Pe sesiune</div><div id="st-by-session"><p style="color:var(--text3);font-size:12px;font-family:'DM Mono',monospace;">Date insuficiente</p></div></div>
+    <div class="breakdown-card"><div class="breakdown-title">Pe tip de zi</div><div id="st-by-tipzi"><p style="color:var(--text3);font-size:12px;font-family:'DM Mono',monospace;">Date insuficiente</p></div></div>
+    <div class="breakdown-card"><div class="breakdown-title">Pe lichiditate</div><div id="st-by-lichid"><p style="color:var(--text3);font-size:12px;font-family:'DM Mono',monospace;">Date insuficiente</p></div></div>
+    <div class="breakdown-card"><div class="breakdown-title">Respectare reguli</div><div id="st-by-rules"><p style="color:var(--text3);font-size:12px;font-family:'DM Mono',monospace;">Date insuficiente</p></div></div>
+  </div>
+
+  <!-- EVALUARE -->
+  <div class="section">
+    <div class="section-label">Evaluare matematică</div>
+    <div class="card">
+      <div class="math-row"><div class="math-key">WR necesar break-even la R:R 1:2</div><div class="math-val warn">34%</div></div>
+      <div class="math-row"><div class="math-key">Win Rate actual</div><div class="math-val" id="st-wr-note">—</div></div>
+      <div class="math-row"><div class="math-key">Statut strategie</div><div class="math-val" id="st-status">Adaugă trade-uri</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ SETĂRI ═══════════════════════════════ -->
+<!-- ═══════════════════════════════ CALENDAR ═══════════════════════════════ -->
+<div id="page-calendar" class="page">
+
+  <div class="section">
+    <div class="section-label">Calendar economic — evenimente macro</div>
+    <div class="highlight">
+      <strong>Rutina zilnică:</strong> Deschide calendarul înainte de fiecare sesiune. Dacă există vreun eveniment 🔴 <strong>High Impact</strong> în intervalul tău de trading — <strong>nu execuți nimic în acea zi.</strong> Simplu.
+    </div>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden;border-radius:var(--radius);">
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
+      {
+        "colorTheme": "dark",
+        "isTransparent": true,
+        "width": "100%",
+        "height": "600",
+        "locale": "en",
+        "importanceFilter": "-1,0,1",
+        "countryFilter": "us,eu,gb,de,fr"
+      }
+      </script>
+    </div>
+  </div>
+
+  <div class="section" style="margin-top:20px;">
+    <div class="section-label">Cum citești calendarul — pas cu pas</div>
+    <div class="card">
+      <div class="rule-item">
+        <div class="rule-n">1</div>
+        <div class="rule-text">Uită-te la coloana <strong>Importance</strong> — aceasta îți spune cât de mult poate mișca evenimentul piața.</div>
+      </div>
+      <div class="rule-item">
+        <div class="rule-n">2</div>
+        <div class="rule-text">
+          <strong>🔴 High Impact</strong> — eveniment major. <span class="warn">Nu tranzacționezi în acea zi, indiferent cât de bun pare setup-ul.</span> Piața devine imprevizibilă — spread-urile cresc, mișcările sunt haotice, SL-urile sunt vânate agresiv.
+        </div>
+      </div>
+      <div class="rule-item">
+        <div class="rule-n">3</div>
+        <div class="rule-text">
+          <strong>🟡 Medium Impact</strong> — atenție sporită. Poți tranzacționa, dar <span class="muted">evită să ai poziții deschise cu 15 minute înainte și după eveniment.</span>
+        </div>
+      </div>
+      <div class="rule-item">
+        <div class="rule-n">4</div>
+        <div class="rule-text">
+          <strong>⚪ Low Impact</strong> — ignoră complet. Nu afectează semnificativ DAX40 sau UK100.
+        </div>
+      </div>
+      <div class="rule-item">
+        <div class="rule-n">5</div>
+        <div class="rule-text">
+          Coloanele <strong>Forecast</strong> și <strong>Previous</strong> îți arată ce se așteaptă vs ce a fost data trecută. Dacă <strong>Actual</strong> iese mult diferit față de Forecast — volatilitate mare garantată.
+        </div>
+      </div>
+      <div class="rule-item">
+        <div class="rule-n">6</div>
+        <div class="rule-text">
+          <strong>Țări relevante pentru tine:</strong> <span class="badge badge-blue">US</span> <span class="badge badge-blue">EU</span> <span class="badge badge-blue">UK</span> <span class="badge badge-blue">DE</span> — restul le poți ignora în cea mai mare parte.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Evenimente de evitat — lista completă</div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title" style="color:var(--red);">🇺🇸 Statele Unite</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+          <div class="rule-item" style="padding:6px 0;">
+            <div class="rule-n" style="color:var(--red);">🔴</div>
+            <div class="rule-text" style="font-size:13px;"><strong>NFP</strong> — Non-Farm Payrolls. Prima vineri a fiecărei luni, 15:30. Cel mai important eveniment lunar.</div>
+          </div>
+          <div class="rule-item" style="padding:6px 0;">
+            <div class="rule-n" style="color:var(--red);">🔴</div>
+            <div class="rule-text" style="font-size:13px;"><strong>CPI</strong> — Consumer Price Index (inflație). Lunar, ~15:30.</div>
+          </div>
+          <div class="rule-item" style="padding:6px 0;">
+            <div class="rule-n" style="color:var(--red);">🔴</div>
+            <div class="rule-text" style="font-size:13px;"><strong>Fed Rate Decision</strong> — Decizia dobânzii Fed. De 8 ori pe an, ~21:00.</div>
+          </div>
+          <div class="rule-item" style="padding:6px 0;">
+            <div class="rule-n" style="color:var(--red);">🔴</div>
+            <div class="rule-text" style="font-size:13px;"><strong>FOMC Statement + Powell Speech</strong> — după Fed decision.</div>
+          </div>
+          <div class="rule-item" style="padding:6px 0;">
+            <div class="rule-n" style="color:var(--red);">🔴</div>
+            <div class="rule-text" style="font-size:13px;"><strong>GDP</strong> — Produs Intern Brut. Trimestrial.</div>
+          </div>
+          <div class="rule-item" style="padding:6px 0;">
+            <div class="rule-n" style="color:var(--amber);">🟡</div>
+            <div class="rule-text" style="font-size:13px;"><strong>PPI, Retail Sales, Unemployment Claims</strong> — medium impact, precauție.</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="color:var(--blue);">🇪🇺 Europa &amp; UK</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+          <div class="rule-item" style="padding:6px 0;">
+            <div class="rule-n" style="color:var(--red);">🔴</div>
+            <div class="rule-text" style="font-size:13px;"><strong>ECB Rate Decision</strong> — Banca Centrală Europeană. De 8 ori pe an, ~14:15.</div>
+          </div>
+          <div class="rule-item" style="padding:6px 0;">
+            <div class="rule-n" style="color:var(--red);">🔴</div>
+            <div class="rule-text" style="font-size:13px;"><strong>BOE Rate Decision</strong> — Bank of England. De 8 ori pe an. Critical pentru UK100.</div>
+          </div>
+          <div class="rule-item" style="padding:6px 0;">
+            <div class="rule-n" style="color:var(--red);">🔴</div>
+            <div class="rule-text" style="font-size:13px;"><strong>German CPI / EU CPI</strong> — inflație europeană. Afectează direct DAX40.</div>
+          </div>
+          <div class="rule-item" style="padding:6px 0;">
+            <div class="rule-n" style="color:var(--red);">🔴</div>
+            <div class="rule-text" style="font-size:13px;"><strong>UK CPI</strong> — inflație UK. Afectează direct UK100.</div>
+          </div>
+          <div class="rule-item" style="padding:6px 0;">
+            <div class="rule-n" style="color:var(--amber);">🟡</div>
+            <div class="rule-text" style="font-size:13px;"><strong>German GDP, EU GDP, UK GDP</strong> — medium spre high impact.</div>
+          </div>
+          <div class="rule-item" style="padding:6px 0;">
+            <div class="rule-n" style="color:var(--amber);">🟡</div>
+            <div class="rule-text" style="font-size:13px;"><strong>PMI Manufacturing/Services</strong> — medium impact, precauție.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+  <div class="section">
+    <div class="section-label">Personalizare</div>
+    <div class="card">
+      <div class="settings-group">
+        <div class="settings-title">Identitate</div>
+        <div class="settings-row">
+          <div class="settings-key">Numele tău / trader name<small>Apare în header-ul aplicației</small></div>
+          <input class="settings-input" id="set-name" type="text" placeholder="ex: Alex Trading">
+        </div>
+        <div class="settings-row">
+          <div class="settings-key">Numele strategiei<small>Titlul principal</small></div>
+          <input class="settings-input" id="set-strategy" type="text" placeholder="SMC Liquidity Flow">
+        </div>
+        <div class="settings-row">
+          <div class="settings-key">Versiunea<small>ex: v1.0, v2.1</small></div>
+          <input class="settings-input" id="set-version" type="text" placeholder="Versiune Finală">
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-title">Risk Management</div>
+        <div class="settings-row">
+          <div class="settings-key">Risc per trade (%)<small>Afișat în plan și statistici</small></div>
+          <input class="settings-input" id="set-risc" type="text" placeholder="0.5% – 1%">
+        </div>
+        <div class="settings-row">
+          <div class="settings-key">R:R minim țintă<small>ex: 2 pentru 1:2</small></div>
+          <input class="settings-input" id="set-rr" type="number" placeholder="2" step="0.5" min="1">
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-title">Target-uri backtesting</div>
+        <div class="settings-row">
+          <div class="settings-key">Minim trades Backtesting<small>Număr minim înainte de a trece pe Demo</small></div>
+          <input class="settings-input" id="set-target-bt" type="number" placeholder="150" min="1">
+        </div>
+        <div class="settings-row">
+          <div class="settings-key">Minim trades Demo<small>Număr minim înainte de a trece pe Real</small></div>
+          <input class="settings-input" id="set-target-dm" type="number" placeholder="50" min="1">
+        </div>
+        <div class="settings-row">
+          <div class="settings-key">Minim trades Real<small>Referință pentru statistici solide</small></div>
+          <input class="settings-input" id="set-target-rl" type="number" placeholder="50" min="1">
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="saveSettings()">Salvează setările</button>
+        <span id="settings-msg" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text3);align-self:center;"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Date aplicație</div>
+    <div class="card">
+      <div class="math-row"><div class="math-key">Total trade-uri salvate</div><div class="math-val" id="set-total-trades">0</div></div>
+      <div class="math-row"><div class="math-key">Stocare locală</div><div class="math-val" style="color:var(--text2);">Browser localStorage</div></div>
+      <div class="math-row"><div class="math-key">Stocare cloud</div><div class="math-val" id="cloud-status" style="color:var(--red);">✗ Inactiv</div></div>
+      <div class="math-row"><div class="math-key">Export backup</div><div class="math-val"><button class="btn btn-sm" onclick="exportData()">Export JSON</button></div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Sincronizare cloud — acces de pe orice dispozitiv</div>
+    <div class="info-box" style="margin-bottom:12px;">
+      <strong>Cum funcționează:</strong> Datele din jurnal se salvează atât local cât și în cloud (JSONBin.io — gratuit). Astfel poți accesa toate trade-urile tale de pe orice dispozitiv — telefon, alt laptop, orice.<br><br>
+      <strong>Setup în 3 pași:</strong><br>
+      1. Mergi pe <strong>jsonbin.io</strong> → creezi cont gratuit<br>
+      2. Dashboard → <strong>API Keys</strong> → copiezi <strong>Master Key</strong><br>
+      3. Lipești key-ul mai jos și dai click <strong>"Creează baza de date"</strong>
+    </div>
+    <div class="card">
+      <div class="settings-group">
+        <div class="settings-row">
+          <div class="settings-key">JSONBin Master Key<small>De pe jsonbin.io → API Keys</small></div>
+          <input class="settings-input" id="set-cloud-key" type="password" placeholder="$2a$10$...">
+        </div>
+        <div class="settings-row">
+          <div class="settings-key">Bin ID<small>Se completează automat după creare</small></div>
+          <input class="settings-input" id="set-cloud-bin" type="text" placeholder="Se generează automat">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;align-items:center;">
+        <button class="btn btn-primary" onclick="createCloudBin()">+ Creează baza de date</button>
+        <button class="btn" onclick="saveCloudSettings()">Conectează (am deja Bin ID)</button>
+        <button class="btn" onclick="loadFromCloud()">↓ Încarcă din cloud</button>
+        <span id="sync-status" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text3);"></span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:60px;padding-top:24px;border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+  <span id="footer-name">SMC Liquidity Flow · Versiune Finală</span>
+  <span>Proces → Execuție → Statistică → Consistență</span>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// ─── LEARNING SYSTEM ─────────────────────────────────────────────────────────
+const LRN_DEFAULT_MODULES = [
+  {
+    id: 'ep-rares',
+    title: 'Trading Institutional — Rares Gabriel',
+    desc: 'Seria de 5 episoade cu care ai inceput. Fundatia intregului plan.',
+    order: 0,
+    videos: [
+      { id: 'r1', title: 'Trading Institutional Ep.1', url: '', watched: false },
+      { id: 'r2', title: 'Trading Institutional Ep.2', url: '', watched: false },
+      { id: 'r3', title: 'Trading Institutional Ep.3', url: '', watched: false },
+      { id: 'r4', title: 'Trading Institutional Ep.4', url: '', watched: false },
+      { id: 'r5', title: 'Trading Institutional Ep.5', url: '', watched: false }
+    ]
+  },
+  {
+    id: 'mod-lichiditate',
+    title: 'Modul 1 — Lichiditate',
+    desc: 'Ce este lichiditatea, de ce se misca piata spre ea, cum o identifici pe grafic. Cel mai important concept din strategie.',
+    order: 1,
+    videos: []
+  },
+  {
+    id: 'mod-sweep',
+    title: 'Modul 2 — Sweep of Liquidity',
+    desc: 'Cum arata un sweep valid: wick lung care penetreaza nivelul + close inapoi in range. Diferenta dintre sweep si breakout real.',
+    order: 2,
+    videos: []
+  },
+  {
+    id: 'mod-displacement',
+    title: 'Modul 3 — Displacement',
+    desc: 'Impulsul institutional: rapid, clar, fara ezitare. Cum il diferentiezi de o miscare lenta. Daca ai dubii nu e displacement.',
+    order: 3,
+    videos: []
+  },
+  {
+    id: 'mod-mss',
+    title: 'Modul 4 — Market Structure Shift (MSS)',
+    desc: 'Definitia stricta: break + close dincolo de swing anterior + displacement. Toate 3 obligatorii simultan.',
+    order: 4,
+    videos: []
+  },
+  {
+    id: 'mod-fvg',
+    title: 'Modul 5 — Fair Value Gap (FVG)',
+    desc: 'Dezechilibrul creat de displacement. Valid: dupa impuls puternic, in discount/premium. Invalid: in mijlocul unui range.',
+    order: 5,
+    videos: []
+  },
+  {
+    id: 'mod-topdown',
+    title: 'Modul 6 — Analiza Top-Down',
+    desc: 'Weekly → Daily → H1 → M15/M5. Cum construiesti biasul zilei si cum confirmi tipul de zi in primele 30 minute.',
+    order: 6,
+    videos: []
+  },
+  {
+    id: 'mod-sesiuni',
+    title: 'Modul 7 — Sesiuni & Tipuri de Zile',
+    desc: 'London 10:30-12:00, NYSE 16:30-18:30. Trend Day, Reversal Day, Range Day. Cum identifici in primele 30 min.',
+    order: 7,
+    videos: []
+  },
+  {
+    id: 'mod-setup1',
+    title: 'Modul 8 — Setup 1: Sweep + MSS',
+    desc: 'Cei 7 pasi completi: lichiditate → sweep → displacement → MSS → FVG → intrare 50-75% → SL/TP.',
+    order: 8,
+    videos: []
+  },
+  {
+    id: 'mod-setup2',
+    title: 'Modul 9 — Setup 2: FVG Retest',
+    desc: 'Trend H1 aliniat Daily → FVG valid in discount/premium → pullback → MSS M5 → intrare → SL sub FVG.',
+    order: 9,
+    videos: []
+  },
+  {
+    id: 'mod-backtesting',
+    title: 'Modul 10 — Backtesting',
+    desc: 'Cum faci backtesting corect pe TradingView. Replay mode, cum notezi trade-urile, ce cauti in cei 150 de trade-uri.',
+    order: 10,
+    videos: []
+  }
+];
+
+let lrnModules = JSON.parse(localStorage.getItem('smc_learn') || 'null') || LRN_DEFAULT_MODULES;
+let lrnActiveModuleId = null;
+
+function lrnSave() {
+  localStorage.setItem('smc_learn', JSON.stringify(lrnModules));
+  lrnRender();
+  lrnUpdateStats();
+}
+
+function lrnUpdateStats() {
+  let total = 0, watched = 0, modsDone = 0;
+  lrnModules.forEach(m => {
+    total += m.videos.length;
+    const w = m.videos.filter(v => v.watched).length;
+    watched += w;
+    if (m.videos.length > 0 && w === m.videos.length) modsDone++;
+  });
+  document.getElementById('lrn-watched').textContent = watched;
+  document.getElementById('lrn-total').textContent = total;
+  document.getElementById('lrn-pct').textContent = total ? Math.round(watched/total*100)+'%' : '0%';
+  document.getElementById('lrn-mods').textContent = modsDone + '/' + lrnModules.length;
+}
+
+function lrnRender() {
+  const c = document.getElementById('lrn-container');
+  if (!c) return;
+  c.innerHTML = lrnModules.map((m, mi) => {
+    const total = m.videos.length;
+    const watched = m.videos.filter(v => v.watched).length;
+    const pct = total ? Math.round(watched/total*100) : 0;
+    const done = total > 0 && watched === total;
+    const borderColor = done ? 'var(--green-border)' : 'var(--border)';
+    const videos = m.videos.map((v, vi) => `
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);">
+        <div onclick="lrnToggle('${m.id}','${v.id}')" style="width:18px;height:18px;border-radius:4px;border:1.5px solid ${v.watched ? 'var(--accent)' : 'var(--border2)'};background:${v.watched ? 'var(--accent)' : 'transparent'};flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+          ${v.watched ? '<div style="width:5px;height:9px;border:2px solid #0d0f0e;border-top:none;border-left:none;transform:rotate(45deg) translate(-1px,-1px);"></div>' : ''}
+        </div>
+        <div style="flex:1;font-size:13px;color:${v.watched ? 'var(--text3)' : 'var(--text)'};${v.watched ? 'text-decoration:line-through;' : ''}">
+          ${v.url ? `<a href="${v.url}" target="_blank" style="color:inherit;text-decoration:none;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='${v.watched ? 'var(--text3)' : 'var(--text)'}'">${v.title} ↗</a>` : v.title}
+        </div>
+        <button onclick="lrnDeleteVideo('${m.id}','${v.id}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text3)'">×</button>
+      </div>`).join('');
+
+    return `
+    <div class="section">
+      <div class="section-label">
+        <span style="color:${done ? 'var(--green)' : 'var(--text3)'};">${done ? '✓' : String(m.order).padStart(2,'0')}</span>
+        ${m.title}
+      </div>
+      <div class="card" style="border-color:${borderColor};">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6;">${m.desc}</div>
+        ${total > 0 ? `
+        <div style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);margin-bottom:4px;">
+            <span>${watched}/${total} vizionate</span><span>${pct}%</span>
+          </div>
+          <div style="background:var(--bg3);border-radius:99px;height:4px;overflow:hidden;">
+            <div style="height:100%;border-radius:99px;background:${done ? 'var(--green)' : 'var(--accent)'};width:${pct}%;transition:width 0.4s;"></div>
+          </div>
+        </div>` : ''}
+        ${videos ? `<div style="margin-bottom:10px;">${videos}</div>` : ''}
+        <button class="btn btn-sm" onclick="lrnOpenModal('${m.id}')" style="margin-top:4px;">+ Adauga video</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function lrnToggle(moduleId, videoId) {
+  const m = lrnModules.find(x => x.id === moduleId);
+  if (!m) return;
+  const v = m.videos.find(x => x.id === videoId);
+  if (v) { v.watched = !v.watched; lrnSave(); }
+}
+
+function lrnDeleteVideo(moduleId, videoId) {
+  if (!confirm('Stergi acest video?')) return;
+  const m = lrnModules.find(x => x.id === moduleId);
+  if (m) { m.videos = m.videos.filter(v => v.id !== videoId); lrnSave(); }
+}
+
+function lrnOpenModal(moduleId) {
+  lrnActiveModuleId = moduleId;
+  document.getElementById('lrn-inp-title').value = '';
+  document.getElementById('lrn-inp-url').value = '';
+  const modal = document.getElementById('lrn-modal');
+  modal.style.display = 'flex';
+}
+
+function lrnCloseModal() {
+  document.getElementById('lrn-modal').style.display = 'none';
+  lrnActiveModuleId = null;
+}
+
+function lrnSaveVideo() {
+  const title = document.getElementById('lrn-inp-title').value.trim();
+  const url = document.getElementById('lrn-inp-url').value.trim();
+  if (!title) { alert('Introdu un titlu'); return; }
+  const m = lrnModules.find(x => x.id === lrnActiveModuleId);
+  if (m) {
+    m.videos.push({ id: 'v' + Date.now(), title, url, watched: false });
+    lrnSave();
+  }
+  lrnCloseModal();
+}
+
+
+let trades = JSON.parse(localStorage.getItem('smc_trades_v3') || '[]');
+let settings = JSON.parse(localStorage.getItem('smc_settings') || '{}');
+let currentFilter = 'all';
+let currentStatFilter = 'all';
+let cloudBinId = localStorage.getItem('smc_cloud_bin') || '';
+let cloudApiKey = localStorage.getItem('smc_cloud_key') || '';
+let isSyncing = false;
+
+function save() {
+  localStorage.setItem('smc_trades_v3', JSON.stringify(trades));
+  if (cloudBinId && cloudApiKey) syncToCloud();
+}
+function saveSet() { localStorage.setItem('smc_settings', JSON.stringify(settings)); }
+
+async function syncToCloud() {
+  if (isSyncing) return;
+  isSyncing = true;
+  showSyncStatus('sync', 'Se sincronizează...');
+  try {
+    const payload = { trades, settings, lastSync: new Date().toISOString() };
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${cloudBinId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Master-Key': cloudApiKey },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    showSyncStatus('ok', 'Sincronizat ✓');
+  } catch(e) {
+    showSyncStatus('err', 'Eroare sync ✗');
+  }
+  isSyncing = false;
+}
+
+async function loadFromCloud() {
+  if (!cloudBinId || !cloudApiKey) return;
+  showSyncStatus('sync', 'Se încarcă din cloud...');
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${cloudBinId}/latest`, {
+      headers: { 'X-Master-Key': cloudApiKey }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const record = data.record;
+    if (record.trades) {
+      trades = record.trades;
+      localStorage.setItem('smc_trades_v3', JSON.stringify(trades));
+    }
+    if (record.settings) {
+      settings = record.settings;
+      localStorage.setItem('smc_settings', JSON.stringify(settings));
+      applySettings();
+    }
+    renderJournal();
+    showSyncStatus('ok', 'Date încărcate din cloud ✓');
+  } catch(e) {
+    showSyncStatus('err', 'Nu s-a putut conecta la cloud');
+  }
+}
+
+async function createCloudBin() {
+  const key = document.getElementById('set-cloud-key').value.trim();
+  if (!key) { alert('Introdu API key-ul de la JSONBin.io'); return; }
+  try {
+    showSyncStatus('sync', 'Se creează baza de date...');
+    const res = await fetch('https://api.jsonbin.io/v3/b', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Master-Key': key, 'X-Bin-Name': 'SMC-Trading-Plan', 'X-Bin-Private': 'true' },
+      body: JSON.stringify({ trades, settings, lastSync: new Date().toISOString() })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    cloudBinId = data.metadata.id;
+    cloudApiKey = key;
+    localStorage.setItem('smc_cloud_bin', cloudBinId);
+    localStorage.setItem('smc_cloud_key', cloudApiKey);
+    document.getElementById('set-cloud-bin').value = cloudBinId;
+    document.getElementById('set-cloud-key').value = key;
+    showSyncStatus('ok', 'Baza de date creată! ID: ' + cloudBinId);
+    updateCloudStatus();
+  } catch(e) {
+    showSyncStatus('err', 'Eroare: ' + e.message);
+  }
+}
+
+function saveCloudSettings() {
+  cloudBinId = document.getElementById('set-cloud-bin').value.trim();
+  cloudApiKey = document.getElementById('set-cloud-key').value.trim();
+  localStorage.setItem('smc_cloud_bin', cloudBinId);
+  localStorage.setItem('smc_cloud_key', cloudApiKey);
+  updateCloudStatus();
+  if (cloudBinId && cloudApiKey) loadFromCloud();
+}
+
+function showSyncStatus(type, msg) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = type === 'ok' ? 'var(--green)' : type === 'err' ? 'var(--red)' : 'var(--amber)';
+}
+
+function updateCloudStatus() {
+  const statusEl = document.getElementById('cloud-status');
+  if (!statusEl) return;
+  if (cloudBinId && cloudApiKey) {
+    statusEl.textContent = '✓ Cloud activ — ID: ' + cloudBinId.slice(0,8) + '...';
+    statusEl.style.color = 'var(--green)';
+  } else {
+    statusEl.textContent = '✗ Cloud inactiv — datele se salvează doar local';
+    statusEl.style.color = 'var(--red)';
+  }
+}
+
+// ─── NAV ──────────────────────────────────────────────────────
+function goPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'statistici') updateStats();
+  if (id === 'jurnal') renderJournal();
+  if (id === 'setari') loadSettings();
+  if (id === 'invatare') { lrnRender(); lrnUpdateStats(); }
+
+}
+
+// ─── PLAN ─────────────────────────────────────────────────────
+function showSetup(id, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+
+function toggleCheck(item) {
+  item.querySelector('.check-box').classList.toggle('checked');
+  item.querySelector('.check-label').classList.toggle('done');
+  const total = document.querySelectorAll('.checklist-item').length;
+  const checked = document.querySelectorAll('.check-box.checked').length;
+  const s = document.getElementById('checklist-status');
+  if (checked === total) { s.textContent = '✓ Toate condițiile bifate — poți executa'; s.classList.add('ready'); }
+  else { s.textContent = checked + ' / ' + total + ' condiții bifate'; s.classList.remove('ready'); }
+}
+
+function resetChecklist() {
+  document.querySelectorAll('.check-box').forEach(b => b.classList.remove('checked'));
+  document.querySelectorAll('.check-label').forEach(l => l.classList.remove('done'));
+  const s = document.getElementById('checklist-status');
+  s.textContent = '0 / 12 condiții bifate'; s.classList.remove('ready');
+}
+
+// ─── JOURNAL ──────────────────────────────────────────────────
+function fv(id) { return document.getElementById(id).value.trim(); }
+
+function addTrade() {
+  const data=fv('f-data'),mode=fv('f-mode'),market=fv('f-market'),setup=fv('f-setup'),
+        sesiune=fv('f-sesiune'),tipzi=fv('f-tipzi'),dir=fv('f-directie'),
+        lichid=fv('f-lichid'),risc=fv('f-risc'),rez=fv('f-rezultat'),
+        reguli=fv('f-reguli'),emotie=fv('f-emotie'),nota=fv('f-nota');
+  const msg = document.getElementById('form-msg');
+  if (!data||!mode||!market||!setup||!dir||!risc||!rez||!reguli) {
+    msg.textContent = '⚠ Completează câmpurile obligatorii'; msg.style.color = 'var(--amber)'; return;
+  }
+  const r = parseFloat(rez);
+  if (isNaN(r)) { msg.textContent = '⚠ Rezultatul trebuie să fie un număr'; msg.style.color = 'var(--amber)'; return; }
+  trades.push({ id: Date.now(), data, mode, market, setup, sesiune, tipzi, dir, lichid, risc: parseFloat(risc), rezultat: r, reguli, emotie, nota });
+  save(); renderJournal();
+  ['f-data','f-mode','f-market','f-setup','f-sesiune','f-tipzi','f-directie','f-lichid','f-risc','f-rezultat','f-reguli','f-emotie','f-nota'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('f-data').valueAsDate = new Date();
+  msg.textContent = '✓ Trade adăugat!'; msg.style.color = 'var(--green)';
+  setTimeout(() => msg.textContent = '', 2500);
+}
+
+function deleteTrade(id) {
+  if (!confirm('Ștergi acest trade?')) return;
+  trades = trades.filter(t => t.id !== id); save(); renderJournal();
+}
+
+function clearAll() {
+  if (!confirm('Ștergi TOATE trade-urile? Nu se poate anula.')) return;
+  trades = []; save(); renderJournal();
+}
+
+function setModeFilter(mode, btn) {
+  currentFilter = mode;
+  document.querySelectorAll('.mode-filter .mode-btn').forEach(b => b.className = 'mode-btn');
+  if (mode === 'all') btn.classList.add('active-all');
+  else if (mode === 'Backtesting') btn.classList.add('active-bt');
+  else if (mode === 'Demo') btn.classList.add('active-dm');
+  else btn.classList.add('active-rl');
+  renderJournal();
+}
+
+function renderJournal() {
+  const filtered = currentFilter === 'all' ? trades : trades.filter(t => t.mode === currentFilter);
+  const tbody = document.getElementById('journal-body');
+  document.getElementById('trade-count').textContent = filtered.length;
+  if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="13" class="empty-state">Niciun trade pentru filtrul selectat.</td></tr>'; return; }
+  const modeIcon = { 'Backtesting': '📊', 'Demo': '🔵', 'Real': '🟢' };
+  const modeCol = { 'Backtesting': 'ca', 'Demo': 'cb', 'Real': 'cg' };
+  tbody.innerHTML = [...filtered].reverse().map((t, i) => {
+    const pos = t.rezultat > 0;
+    const rc = t.reguli === 'Da' ? 'var(--green)' : t.reguli === 'Nu' ? 'var(--red)' : 'var(--amber)';
+    const tc = t.tipzi === 'Trend Day' ? 'badge-green' : t.tipzi === 'Reversal Day' ? 'badge-amber' : t.tipzi === 'Range Day' ? 'badge-red' : 'badge-gray';
+    return `<tr>
+      <td style="color:var(--text3);font-family:'DM Mono',monospace;">${filtered.length - i}</td>
+      <td style="font-size:13px;" class="${modeCol[t.mode]||''}">${modeIcon[t.mode]||'—'}</td>
+      <td style="font-size:11px;color:var(--text2);">${t.data}</td>
+      <td><span class="badge badge-blue">${t.market}</span></td>
+      <td style="font-size:11px;color:var(--text2);max-width:90px;">${t.setup}</td>
+      <td style="font-size:11px;color:var(--text2);">${t.sesiune||'—'}</td>
+      <td><span class="badge ${tc}" style="font-size:9px;">${t.tipzi||'—'}</span></td>
+      <td><span class="badge ${t.dir==='Long'?'badge-green':'badge-red'}">${t.dir}</span></td>
+      <td style="font-family:'DM Mono',monospace;">${t.risc}%</td>
+      <td class="${pos ? 'r-pos' : 'r-neg'}">${pos ? '+' : ''}${t.rezultat}R</td>
+      <td style="color:${rc};font-size:12px;">${t.reguli}</td>
+      <td style="font-size:11px;color:var(--text2);">${t.emotie||'—'}</td>
+      <td><button class="del-btn" onclick="deleteTrade(${t.id})">×</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── SETTINGS ─────────────────────────────────────────────────
+function loadSettings() {
+  document.getElementById('set-name').value = settings.name || '';
+  document.getElementById('set-strategy').value = settings.strategy || '';
+  document.getElementById('set-version').value = settings.version || '';
+  document.getElementById('set-risc').value = settings.risc || '';
+  document.getElementById('set-rr').value = settings.rr || '';
+  document.getElementById('set-target-bt').value = settings.targetBt || 150;
+  document.getElementById('set-target-dm').value = settings.targetDm || 50;
+  document.getElementById('set-target-rl').value = settings.targetRl || 50;
+  document.getElementById('set-total-trades').textContent = trades.length;
+}
+
+function saveSettings() {
+  settings.name = document.getElementById('set-name').value.trim();
+  settings.strategy = document.getElementById('set-strategy').value.trim();
+  settings.version = document.getElementById('set-version').value.trim();
+  settings.risc = document.getElementById('set-risc').value.trim();
+  settings.rr = parseFloat(document.getElementById('set-rr').value) || 2;
+  settings.targetBt = parseInt(document.getElementById('set-target-bt').value) || 150;
+  settings.targetDm = parseInt(document.getElementById('set-target-dm').value) || 50;
+  settings.targetRl = parseInt(document.getElementById('set-target-rl').value) || 50;
+  saveSet(); applySettings();
+  const msg = document.getElementById('settings-msg');
+  msg.textContent = '✓ Salvat!'; msg.style.color = 'var(--green)';
+  setTimeout(() => msg.textContent = '', 2000);
+}
+
+function applySettings() {
+  const s = settings;
+  if (s.name) { document.getElementById('hdr-name').textContent = '— ' + s.name; }
+  if (s.strategy) { document.getElementById('hdr-title').innerHTML = s.strategy.replace(/(\S+)\s(.+)/, '<span>$1</span> $2') || s.strategy; }
+  if (s.version) { document.getElementById('hdr-tag').textContent = 'Trading Plan — ' + s.version; }
+  if (s.risc) { document.getElementById('disp-risc').textContent = s.risc; document.getElementById('disp-risc2').textContent = s.risc; }
+  if (s.rr) {
+    const rr = s.rr;
+    document.getElementById('disp-rr').textContent = '1:' + rr;
+    document.getElementById('disp-rr4').textContent = '1 : ' + rr;
+    ['disp-rr2','disp-rr3'].forEach(id => document.getElementById(id).textContent = rr);
+  }
+  if (s.targetBt) { document.getElementById('disp-target').textContent = s.targetBt; document.getElementById('disp-target2').textContent = s.targetBt; }
+  if (s.name || s.strategy) { document.getElementById('footer-name').textContent = (s.strategy || 'SMC Liquidity Flow') + (s.version ? ' · ' + s.version : ''); }
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify({ trades, settings }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'trading-plan-backup.json'; a.click();
+}
+
+// ─── STATISTICS ───────────────────────────────────────────────
+function setStatFilter(mode, btn) {
+  currentStatFilter = mode;
+  document.querySelectorAll('#page-statistici .mode-filter .mode-btn').forEach(b => b.className = 'mode-btn');
+  if (mode === 'all') btn.classList.add('active-all');
+  else if (mode === 'Backtesting') btn.classList.add('active-bt');
+  else if (mode === 'Demo') btn.classList.add('active-dm');
+  else btn.classList.add('active-rl');
+  updateStats();
+}
+
+function groupBy(arr, field) {
+  const g = {};
+  arr.forEach(t => {
+    const k = t[field] || '—';
+    if (!g[k]) g[k] = { n: 0, wins: 0, r: 0 };
+    g[k].n++; if (t.rezultat > 0) g[k].wins++; g[k].r += t.rezultat;
+  });
+  return g;
+}
+
+function renderBreakdown(elId, groups) {
+  const el = document.getElementById(elId);
+  const keys = Object.keys(groups);
+  if (!keys.length) { el.innerHTML = '<p style="color:var(--text3);font-size:12px;font-family:\'DM Mono\',monospace;">Date insuficiente</p>'; return; }
+  el.innerHTML = keys.sort((a, b) => groups[b].r - groups[a].r).map(k => {
+    const g = groups[k];
+    const wr = (g.wins / g.n * 100).toFixed(0);
+    const rn = g.r.toFixed(1);
+    const pos = g.r >= 0;
+    return `<div class="brow">
+      <div class="bkey" title="${k}">${k}</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
+        <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);">${g.n}T·${wr}%WR</span>
+        <span class="bval" style="color:${pos ? 'var(--green)' : 'var(--red)'};">${pos ? '+' : ''}${rn}R</span>
+      </div></div>`;
+  }).join('');
+}
+
+function updateStats() {
+  const tBt = settings.targetBt || 150, tDm = settings.targetDm || 50, tRl = settings.targetRl || 50;
+  const bt = trades.filter(t => t.mode === 'Backtesting');
+  const dm = trades.filter(t => t.mode === 'Demo');
+  const rl = trades.filter(t => t.mode === 'Real');
+
+  // progress bars
+  document.getElementById('prog-bt-n').textContent = bt.length;
+  document.getElementById('prog-bt-target').textContent = '/ ' + tBt;
+  document.getElementById('prog-bt-fill').style.width = Math.min(100, bt.length / tBt * 100).toFixed(1) + '%';
+  document.getElementById('prog-dm-n').textContent = dm.length;
+  document.getElementById('prog-dm-target').textContent = '/ ' + tDm;
+  document.getElementById('prog-dm-fill').style.width = Math.min(100, dm.length / tDm * 100).toFixed(1) + '%';
+  document.getElementById('prog-rl-n').textContent = rl.length;
+  document.getElementById('prog-rl-target').textContent = '/ ' + tRl;
+  document.getElementById('prog-rl-fill').style.width = Math.min(100, rl.length / tRl * 100).toFixed(1) + '%';
+
+  const filtered = currentStatFilter === 'all' ? trades : trades.filter(t => t.mode === currentStatFilter);
+
+  if (!filtered.length) {
+    ['st-total','st-wins','st-losses'].forEach(id => document.getElementById(id).textContent = '0');
+    ['st-wr','st-rnet','st-exp','st-avg-win','st-avg-loss','st-wr-note'].forEach(id => document.getElementById(id).textContent = '—');
+    document.getElementById('st-status').textContent = 'Adaugă trade-uri'; document.getElementById('st-status').className = 'math-val';
+    ['st-by-setup','st-by-market','st-by-session','st-by-tipzi','st-by-lichid','st-by-rules'].forEach(id => { document.getElementById(id).innerHTML = '<p style="color:var(--text3);font-size:12px;font-family:\'DM Mono\',monospace;">Date insuficiente</p>'; });
+    document.getElementById('streak-dots').innerHTML = '<div style="color:var(--text3);font-family:\'DM Mono\',monospace;font-size:12px;">Niciun trade</div>';
+    ['st-max-win','st-max-loss','st-cur-streak'].forEach(id => document.getElementById(id).textContent = '—');
+    drawEquity([]); drawBarChart('chart-setup', 'chart-setup-empty', {}); drawBarChart('chart-session', 'chart-session-empty', {}); return;
+  }
+
+  const wins = filtered.filter(t => t.rezultat > 0);
+  const losses = filtered.filter(t => t.rezultat < 0);
+  const wr = (wins.length / filtered.length * 100).toFixed(1);
+  const rnet = filtered.reduce((s, t) => s + t.rezultat, 0).toFixed(2);
+  const exp = (filtered.reduce((s, t) => s + t.rezultat, 0) / filtered.length).toFixed(2);
+  const avgWin = wins.length ? (wins.reduce((s, t) => s + t.rezultat, 0) / wins.length).toFixed(2) : '—';
+  const avgLoss = losses.length ? (losses.reduce((s, t) => s + t.rezultat, 0) / losses.length).toFixed(2) : '—';
+
+  document.getElementById('st-total').textContent = filtered.length;
+  document.getElementById('st-wins').textContent = wins.length;
+  document.getElementById('st-losses').textContent = losses.length;
+  document.getElementById('st-wr').textContent = wr + '%';
+  document.getElementById('st-rnet').textContent = (rnet >= 0 ? '+' : '') + rnet + 'R';
+  document.getElementById('st-rnet').className = 'big-stat-num ' + (rnet >= 0 ? 'cg' : 'cr');
+  document.getElementById('st-exp').textContent = (exp >= 0 ? '+' : '') + exp + 'R';
+  document.getElementById('st-avg-win').textContent = avgWin !== '—' ? '+' + avgWin + 'R' : '—';
+  document.getElementById('st-avg-loss').textContent = avgLoss !== '—' ? avgLoss + 'R' : '—';
+  document.getElementById('st-wr-note').textContent = wr + '%';
+  document.getElementById('st-wr-note').className = 'math-val ' + (parseFloat(wr) >= 34 ? 'pos' : 'neg');
+
+  const sEl = document.getElementById('st-status');
+  if (filtered.length < 20) { sEl.textContent = 'Prea puține date (' + filtered.length + '/20 minim)'; sEl.className = 'math-val warn'; }
+  else if (parseFloat(exp) > 0) { sEl.textContent = '✓ Strategia este profitabilă matematic'; sEl.className = 'math-val pos'; }
+  else { sEl.textContent = '✗ Sub break-even — analizează execuția'; sEl.className = 'math-val neg'; }
+
+  // breakdowns
+  renderBreakdown('st-by-setup', groupBy(filtered, 'setup'));
+  renderBreakdown('st-by-market', groupBy(filtered, 'market'));
+  renderBreakdown('st-by-session', groupBy(filtered, 'sesiune'));
+  renderBreakdown('st-by-tipzi', groupBy(filtered, 'tipzi'));
+  renderBreakdown('st-by-lichid', groupBy(filtered, 'lichid'));
+  renderBreakdown('st-by-rules', groupBy(filtered, 'reguli'));
+
+  // streaks
+  updateStreaks(filtered);
+
+  // bar charts
+  drawBarChart('chart-setup', 'chart-setup-empty', groupBy(filtered, 'setup'));
+  drawBarChart('chart-session', 'chart-session-empty', groupBy(filtered, 'sesiune'));
+
+  // equity
+  const cumR = []; let cum = 0;
+  filtered.forEach(t => { cum += t.rezultat; cumR.push(parseFloat(cum.toFixed(2))); });
+  drawEquity(cumR);
+}
+
+function updateStreaks(filtered) {
+  const last30 = filtered.slice(-30);
+  const wrap = document.getElementById('streak-dots');
+  if (!last30.length) { wrap.innerHTML = '<div style="color:var(--text3);font-family:\'DM Mono\',monospace;font-size:12px;">Niciun trade</div>'; return; }
+  wrap.innerHTML = last30.map(t => {
+    const pos = t.rezultat > 0;
+    return `<div class="streak-dot" style="background:${pos ? 'var(--green)' : 'var(--red)'}" title="${t.data}: ${pos ? '+' : ''}${t.rezultat}R"></div>`;
+  }).join('');
+
+  let maxW = 0, maxL = 0, curW = 0, curL = 0;
+  filtered.forEach(t => {
+    if (t.rezultat > 0) { curW++; curL = 0; maxW = Math.max(maxW, curW); }
+    else { curL++; curW = 0; maxL = Math.max(maxL, curL); }
+  });
+  document.getElementById('st-max-win').textContent = maxW;
+  document.getElementById('st-max-loss').textContent = maxL;
+  const last = filtered[filtered.length - 1];
+  if (last) {
+    const pos = last.rezultat > 0;
+    document.getElementById('st-cur-streak').textContent = (pos ? curW + ' win' : curL + ' loss') + (pos ? '' : '');
+    document.getElementById('st-cur-streak').style.color = pos ? 'var(--green)' : 'var(--red)';
+  }
+}
+
+function drawBarChart(canvasId, emptyId, groups) {
+  const canvas = document.getElementById(canvasId);
+  const empty = document.getElementById(emptyId);
+  const keys = Object.keys(groups).filter(k => groups[k].n > 0);
+  if (!keys.length) { canvas.style.display = 'none'; empty.style.display = 'block'; return; }
+  canvas.style.display = 'block'; empty.style.display = 'none';
+
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.parentElement.clientWidth - 40 || 500;
+  const H = 120;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr); ctx.clearRect(0, 0, W, H);
+
+  const pl = 8, pr = 8, pt = 16, pb = 36;
+  const bw = Math.min(80, (W - pl - pr) / keys.length - 12);
+  const gap = (W - pl - pr - bw * keys.length) / (keys.length + 1);
+  const maxH = H - pt - pb;
+
+  keys.forEach((k, i) => {
+    const g = groups[k];
+    const wr = g.wins / g.n;
+    const bh = Math.max(4, wr * maxH);
+    const x = pl + gap + i * (bw + gap);
+    const y = pt + maxH - bh;
+    const color = wr >= 0.5 ? '#4ade80' : wr >= 0.34 ? '#fbbf24' : '#f87171';
+
+    ctx.fillStyle = color + '22';
+    ctx.beginPath(); ctx.roundRect(x, pt, bw, maxH, 4); ctx.fill();
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.roundRect(x, y, bw, bh, 4); ctx.fill();
+
+    ctx.fillStyle = color;
+    ctx.font = `500 11px DM Mono, monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText((wr * 100).toFixed(0) + '%', x + bw / 2, y - 5);
+
+    ctx.fillStyle = 'rgba(138,144,137,0.8)';
+    ctx.font = '10px DM Mono, monospace';
+    const label = k.replace('Setup ', 'S').replace(' — Sweep+MSS', '').replace(' — FVG Retest', '').replace(' (10:30–12:00)', '\nLON').replace(' (16:30–18:30)', '\nNYSE');
+    const lines = label.split('\n');
+    lines.forEach((line, li) => ctx.fillText(line, x + bw / 2, H - pb + 14 + li * 13));
+    ctx.fillStyle = 'rgba(90,97,90,0.7)';
+    ctx.fillText(g.n + 'T', x + bw / 2, H - pb + 14 + lines.length * 13);
+  });
+
+  // 34% line
+  const lineY = pt + maxH - 0.34 * maxH;
+  ctx.strokeStyle = 'rgba(251,191,36,0.3)'; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+  ctx.beginPath(); ctx.moveTo(pl, lineY); ctx.lineTo(W - pr, lineY); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(251,191,36,0.6)'; ctx.font = '9px DM Mono, monospace'; ctx.textAlign = 'left';
+  ctx.fillText('34% min', pl + 2, lineY - 3);
+}
+
+function drawEquity(data) {
+  const canvas = document.getElementById('eq-canvas');
+  const empty = document.getElementById('eq-empty');
+  if (!data.length) { canvas.style.display = 'none'; empty.style.display = 'block'; return; }
+  canvas.style.display = 'block'; empty.style.display = 'none';
+  const W = canvas.parentElement.clientWidth - 40 || 600, H = 150;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr); ctx.clearRect(0, 0, W, H);
+  const all = [0, ...data];
+  const mn = Math.min(...all), mx = Math.max(...all), range = mx - mn || 1;
+  const pl = 40, pr = 12, pt = 16, pb = 24, cw = W - pl - pr, ch = H - pt - pb;
+  function xp(i) { return pl + (i / (all.length - 1)) * cw; }
+  function yp(v) { return pt + ch - ((v - mn) / range) * ch; }
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+  ctx.beginPath(); ctx.moveTo(pl, yp(0)); ctx.lineTo(pl + cw, yp(0)); ctx.stroke(); ctx.setLineDash([]);
+  const fin = all[all.length - 1];
+  const col = fin >= 0 ? 'rgba(74,222,128,' : 'rgba(248,113,113,';
+  const g = ctx.createLinearGradient(0, pt, 0, pt + ch);
+  g.addColorStop(0, col + '0.18)'); g.addColorStop(1, col + '0.02)');
+  ctx.beginPath(); ctx.moveTo(xp(0), yp(all[0]));
+  all.forEach((v, i) => { if (i > 0) ctx.lineTo(xp(i), yp(v)); });
+  ctx.lineTo(xp(all.length - 1), pt + ch); ctx.lineTo(xp(0), pt + ch);
+  ctx.closePath(); ctx.fillStyle = g; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(xp(0), yp(all[0]));
+  all.forEach((v, i) => { if (i > 0) ctx.lineTo(xp(i), yp(v)); });
+  ctx.strokeStyle = fin >= 0 ? '#4ade80' : '#f87171'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = 'rgba(138,144,137,0.75)'; ctx.font = '10px DM Mono,monospace';
+  ctx.textAlign = 'right'; ctx.fillText(mx.toFixed(1) + 'R', pl - 4, pt + 4);
+  ctx.fillText(mn.toFixed(1) + 'R', pl - 4, pt + ch + 4);
+  ctx.textAlign = 'right'; ctx.fillText((all.length - 1) + ' trades', pl + cw, pt + ch + 16);
+}
+
+// ─── INIT ─────────────────────────────────────────────────────
+document.getElementById('f-data').valueAsDate = new Date();
+applySettings();
+renderJournal();
+updateCloudStatus();
+lrnRender();
+lrnUpdateStats();
+if (cloudBinId && cloudApiKey) {
+  document.getElementById('set-cloud-bin').value = cloudBinId;
+  document.getElementById('set-cloud-key').value = cloudApiKey;
+}
+
+// WELCOME SCREEN
+function initWelcome() {
+  const name = settings.name || '';
+  const strategy = settings.strategy || 'SMC Liquidity Flow';
+  const version = settings.version || 'Versiune Finală';
+  const nameEl = document.getElementById('wlc-name');
+  const subEl = document.getElementById('wlc-sub');
+  if (name) {
+    const parts = name.trim().split(' ');
+    const first = parts[0];
+    const rest = parts.slice(1).join(' ');
+    nameEl.innerHTML = rest ? `${first} <span>${rest}</span>` : `<span>${first}</span>`;
+  }
+  subEl.textContent = strategy + ' · ' + version;
+  // auto dismiss after 3.2s
+  setTimeout(() => dismissWelcome(), 3200);
+}
+
+function dismissWelcome() {
+  const ws = document.getElementById('welcome-screen');
+  if (!ws || ws.classList.contains('fade-out')) return;
+  ws.classList.add('fade-out');
+  setTimeout(() => ws.style.display = 'none', 600);
+}
+
+initWelcome();
+</script>
+</body>
+</html>
